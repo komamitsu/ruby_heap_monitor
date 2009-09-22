@@ -1,3 +1,7 @@
+# Author::    Mitsunori Komatsu
+# Copyright:: Copyright (c) 2009 Mitsunori Komatsu
+# License::   Distributes under the same terms as Ruby
+
 = ruby_heap_monitor
 This is a patch for ruby to enable to monitor the live objects in the heap.
 
