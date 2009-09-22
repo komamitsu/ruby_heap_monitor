@@ -1,0 +1,86 @@
+= ruby_heap_monitor
+This is a patch for ruby to enable to monitor the live objects in the heap.
+
+== Install
+Suppose that your ruby's directory name is "ruby18", you can install this patch as follows.
+
+  cp -pr ruby18 ruby18.orig
+  cp -p diff.ruby_heap_monitor ruby18
+  cd ruby18
+  patch -p1 < diff.ruby_heap_monitor
+  make
+  make install
+  cd ..
+  rm -rf ruby18.orig # if install.ok?
+
+== Usage
+After installing this patch, you can call ObjectSpace.print_object. This method recieves a opened File object and dumps the live objects in the heap into the file.
+
+== Example
+If you run the following sample code with the patched ruby, you'll get the file 'hoge.log'.
+  class Foo
+    @@cvar = 'foofoo'
+    attr_accessor :int, :float, :array, :hash
+  
+    def initialize(name)
+      @name = name
+      @proc = lambda { a = 'aaaa'; b = 'bbbb' }
+    end
+  
+    def re
+      @name =~ /(T*s)/
+    end
+  end
+  
+  foo = Foo.new('This is Foo')
+  foo.int = 99999999999999999999999999999999999999999
+  foo.float = 0.123456789
+  foo.array = ['first', 'second', 'third']
+  foo.hash = { 'one' => 'Jan', 'two' => 'Feb', 'three' => 'Mar' }
+  foo.re
+  
+  File.open('hoge.log', 'w') do |f|
+    Hoge = Struct.new('Hoge', :cat, :dog, :monkey)
+    hoge = Hoge.new(foo, foo, f)
+
+    # dump the objects in the heap.
+    ObjectSpace.print_object(f)
+  end
+
+You can see the dumped informations inside 'hoge.log' like the below.
+          :
+  ==========================================
+  filename:  hoge.rb
+  linenum:   26
+  class:     Struct::Hoge
+  object_id: 0xB7E4CFA5
+  inspect:   #<struct Struct::Hoge cat=#<Foo:0xb7e4d490 @name="This is Foo", @array=["first", "second", "third"], @float=0.123456789, @int=99999999999999999999999999999999999999999, @proc=#<Proc:0xb7e4e8cc@hoge.rb:7>, @hash={"three"=>"Mar", "two"=>"Feb", "one"=>"Jan"}>, dog=#<Foo:0xb7e4d490 @name="This is Foo", @array=["first", "second", "third"], @float=0.123456789, @int=99999999999999999999999999999999999999999, @proc=#<Proc:0xb7e4e8cc@hoge.rb:7>, @hash={"three"=>"Mar", "two"=>"Feb", "one"=>"Jan"}>, monkey=#<File:hoge.log>>
+  referring_to:
+      0xB7E4D491
+      0x00000023
+      0xB7E4D491
+  ==========================================
+          :
+  ==========================================
+  filename:  hoge.rb
+  linenum:   16
+  class:     Bignum
+  object_id: 0xB7E4E371
+  inspect:   99999999999999999999999999999999999999999
+  ==========================================
+  filename:  hoge.rb
+  linenum:   16
+  type:      Node
+  object_id: 0xB7E4E38D
+  nodetype:  0x67
+  referring_to:
+      0xB7E4E3A9
+      0xB7E4E339
+  ==========================================
+          :
+
+== Problems
+- In the dumped file, references to the objects in the block are something wrong. 
+- I want to remove the node informations from the objects dump. But only they seem to refer the objects in the block. Do any heap objects other than nodes refer the objects in the block ?
+- I tested this patch with only Ruby 1.8.7.
+

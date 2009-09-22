@@ -1,0 +1,231 @@
+diff -Naru ruby18.orig/eval.c ruby18/eval.c
+--- ruby18.orig/eval.c	2009-09-04 23:20:38.000000000 +0900
++++ ruby18/eval.c	2009-09-22 13:44:50.000000000 +0900
+@@ -8277,6 +8277,13 @@
+     }
+ }
+ 
++struct RNode 
++*rb_get_node_from_block(data)
++    void *data;
++{
++    return ((struct BLOCK*)data)->frame.node;
++}
++
+ void
+ Init_eval()
+ {
+diff -Naru ruby18.orig/gc.c ruby18/gc.c
+--- ruby18.orig/gc.c	2009-09-04 23:20:38.000000000 +0900
++++ ruby18/gc.c	2009-09-22 21:44:32.000000000 +0900
+@@ -314,7 +314,7 @@
+     }
+ }
+ 
+-#undef GC_DEBUG
++#define GC_DEBUG
+ 
+ void
+ rb_global_variable(var)
+@@ -2147,6 +2147,192 @@
+     return (VALUE)((long)obj|FIXNUM_FLAG);
+ }
+ 
++/* heap monitor start */
++#include "rubyio.h"
++
++static FILE *heap_dump = NULL;
++
++#define P_REFOBJ(V) do { \
++    if (is_pointer_to_heap((void*)V)) \
++    fprintf(heap_dump, "    0x%08X\n", (unsigned int)rb_obj_id((VALUE)V)); \
++} while (0);
++
++static int
++print_obj_unit(key, value, lev)
++    VALUE key, value;
++    int lev;
++{
++    P_REFOBJ(value);
++    return ST_CONTINUE;
++}
++
++static void
++print_obj_set(tbl)
++    st_table *tbl;
++{
++    if (!tbl) return;
++    st_foreach(tbl, print_obj_unit, 0);
++}
++
++extern struct RNode* rb_get_node_from_block(void *data);
++
++static void
++os_print_obj(argc, argv, os)
++    int argc;
++    VALUE *argv;
++    VALUE os;
++{
++    int i;
++    VALUE file;
++
++    rb_scan_args(argc, argv, "10", &file);
++    if (BUILTIN_TYPE(file) != T_FILE) {
++        rb_raise(rb_eArgError, "wrong type argument %s (should be file object)",
++                rb_obj_classname(file));
++    }
++    heap_dump = GetWriteFile(RFILE(file)->fptr);
++
++    for (i = 0; i < heaps_used; i++) {
++        RVALUE *p, *pend;
++
++        p = heaps[i].slot; pend = p + heaps[i].limit;
++        for (;p < pend; p++) {
++            VALUE obj = (VALUE)p;
++            int type = p->as.basic.flags & T_MASK;
++
++            if (type == T_NONE || type == T_ZOMBIE || 
++                    RANY(obj)->file == NULL ||
++                    strcmp(RANY(obj)->file, "(null)") == 0) continue;
++
++#define P_BAR()      { fprintf(heap_dump, "==========================================\n"); }
++#define P_REFTITLE() { fprintf(heap_dump, "referring_to:\n"); }
++#define P_OBJID()    { fprintf(heap_dump, "object_id: 0x%08X\n", (unsigned int)rb_obj_id(obj)); }
++#define P_TYPE(T)    { fprintf(heap_dump, "type:      %s\n", T); }
++#define P_CLASS()    { fprintf(heap_dump, "class:     %s\n", rb_obj_classname(obj)); }
++#define P_INSPECT()  { fprintf(heap_dump, "inspect:   %s\n", RSTRING_PTR(rb_obj_as_string(rb_inspect(obj)))); }
++#ifdef GC_DEBUG 
++#define P_SOURCE() do { \
++    fprintf(heap_dump, "filename:  %s\n", RANY(obj)->file); \
++    fprintf(heap_dump, "linenum:   %d\n", RANY(obj)->line); \
++} while (0);
++#else
++#define P_SOURCE() {}
++#endif 
++            switch (type) {
++            case T_NODE:
++#define P_NODE(NDTYPE, ND) do { \
++    P_BAR(); \
++    P_SOURCE(); \
++    P_TYPE("Node"); \
++    P_OBJID(); \
++    fprintf(heap_dump, "nodetype:  0x%02X\n", NDTYPE); \
++    P_REFTITLE(); \
++    P_REFOBJ(ND.u1.node); \
++    P_REFOBJ(ND.u2.node); \
++    P_REFOBJ(ND.u3.node); \
++} while (0);
++                P_NODE(nd_type(obj), p->as.node);
++                break;
++            case T_CLASS:
++            case T_ICLASS:
++            case T_MODULE:
++            case T_OBJECT:
++            case T_FLOAT:
++            case T_STRING:
++            case T_REGEXP:
++            case T_ARRAY:
++            case T_HASH:
++            case T_STRUCT:
++            case T_BIGNUM:
++            case T_FILE:
++            case T_MATCH:
++            case T_VARMAP:
++                P_BAR();
++                P_SOURCE();
++                P_CLASS();
++                P_OBJID();
++                if (type != T_ICLASS && type != T_VARMAP)
++                    P_INSPECT();
++                    if (type == T_CLASS || type == T_ICLASS || type == T_MODULE) {
++                        P_REFTITLE();
++                        print_obj_set(p->as.klass.iv_tbl);
++                    }
++                if (type == T_OBJECT) {
++                    P_REFTITLE();
++                    print_obj_set(p->as.object.iv_tbl);
++                }
++                if (type == T_ARRAY) {
++                    long i, len = p->as.array.len;
++                    VALUE *ptr = p->as.array.ptr;
++
++                    P_REFTITLE();
++                    for (i = 0; i < len; i++) {
++                        P_REFOBJ(*ptr++);
++                    }
++                }
++                if (type == T_HASH) {
++                    P_REFTITLE();
++                    print_obj_set(p->as.hash.tbl);
++                }
++                if (type == T_STRUCT) {
++                    long i, len = p->as.rstruct.len;
++                    VALUE *ptr = p->as.rstruct.ptr;
++
++                    P_REFTITLE();
++                    for (i = 0; i < len; i++) {
++                        P_REFOBJ(*ptr++);
++                    }
++                }
++                if (type == T_MATCH) {
++                    P_REFTITLE();
++                    P_REFOBJ(p->as.match.str);
++                }
++                if (type == T_VARMAP) {
++                    struct RVarmap *var = &p->as.varmap;
++
++                    P_REFTITLE();
++                    while (var) {
++                        P_REFOBJ(var->val);
++                        var = var->next;
++                    };
++                }
++                break;
++            case T_DATA:
++                {
++                    struct RNode *node = rb_get_node_from_block((void*)p->as.data.data);
++                    P_BAR();
++                    P_SOURCE();
++                    P_CLASS();
++                    P_OBJID();
++                    P_REFTITLE();
++                    fprintf(heap_dump, "    (the following node)\n");
++                    P_NODE(nd_type(node), (*node));
++                }
++                break;
++            case T_SCOPE:
++                P_BAR();
++                P_SOURCE();
++                P_TYPE("Scope");
++                P_OBJID();
++                if (p->as.scope.local_tbl) {
++                    int n = p->as.scope.local_tbl[0] + 1;
++                    VALUE *vars = &p->as.scope.local_vars[-1];
++
++                    P_REFTITLE();
++                    while (n--) {
++                        P_REFOBJ(*vars++);
++                    };
++                }
++                break;
++            default:
++                break;
++            }
++        }
++    }
++}
++/* heap monitor end */
++
++
+ /*
+  *  The <code>GC</code> module provides an interface to Ruby's mark and
+  *  sweep garbage collection mechanism. Some of the underlying methods
+@@ -2179,6 +2365,8 @@
+ 
+     rb_define_module_function(rb_mObSpace, "_id2ref", id2ref, 1);
+ 
++    rb_define_module_function(rb_mObSpace, "print_object", os_print_obj, -1);
++
+     rb_gc_register_address(&rb_mObSpace);
+     rb_global_variable(&finalizers);
+     rb_gc_unregister_address(&rb_mObSpace);
