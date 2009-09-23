@@ -17,7 +17,7 @@ diff -Naru ruby18.orig/eval.c ruby18/eval.c
  {
 diff -Naru ruby18.orig/gc.c ruby18/gc.c
 --- ruby18.orig/gc.c	2009-09-04 23:20:38.000000000 +0900
-+++ ruby18/gc.c	2009-09-22 21:44:32.000000000 +0900
++++ ruby18/gc.c	2009-09-23 20:52:39.000000000 +0900
 @@ -314,7 +314,7 @@
      }
  }
@@ -27,7 +27,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
  
  void
  rb_global_variable(var)
-@@ -2147,6 +2147,192 @@
+@@ -2147,6 +2147,198 @@
      return (VALUE)((long)obj|FIXNUM_FLAG);
  }
  
@@ -39,7 +39,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +#define P_REFOBJ(V) do { \
 +    if (is_pointer_to_heap((void*)V)) \
 +    fprintf(heap_dump, "    0x%08X\n", (unsigned int)rb_obj_id((VALUE)V)); \
-+} while (0);
++} while (0)
 +
 +static int
 +print_obj_unit(key, value, lev)
@@ -84,23 +84,29 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +            VALUE obj = (VALUE)p;
 +            int type = p->as.basic.flags & T_MASK;
 +
-+            if (type == T_NONE || type == T_ZOMBIE || 
-+                    RANY(obj)->file == NULL ||
-+                    strcmp(RANY(obj)->file, "(null)") == 0) continue;
++            if (type == T_NONE || 
++#ifdef T_ZOMBIE
++                type == T_ZOMBIE || 
++#endif
++                RANY(obj)->file == NULL ||
++                strcmp(RANY(obj)->file, "(null)") == 0) continue;
 +
-+#define P_BAR()      { fprintf(heap_dump, "==========================================\n"); }
-+#define P_REFTITLE() { fprintf(heap_dump, "referring_to:\n"); }
-+#define P_OBJID()    { fprintf(heap_dump, "object_id: 0x%08X\n", (unsigned int)rb_obj_id(obj)); }
-+#define P_TYPE(T)    { fprintf(heap_dump, "type:      %s\n", T); }
-+#define P_CLASS()    { fprintf(heap_dump, "class:     %s\n", rb_obj_classname(obj)); }
-+#define P_INSPECT()  { fprintf(heap_dump, "inspect:   %s\n", RSTRING_PTR(rb_obj_as_string(rb_inspect(obj)))); }
++#define P_BAR()      fprintf(heap_dump, "==========================================\n")
++#define P_REFTITLE() fprintf(heap_dump, "referring_to:\n")
++#define P_OBJID()    fprintf(heap_dump, "object_id: 0x%08X\n", (unsigned int)rb_obj_id(obj))
++#define P_TYPE(T)    fprintf(heap_dump, "type:      %s\n", T)
++#define P_CLASS()    fprintf(heap_dump, "class:     %s\n", rb_obj_classname(obj))
++#ifndef RSTRING_PTR
++#define RSTRING_PTR(s) (RSTRING(s)->ptr)
++#endif
++#define P_INSPECT()  fprintf(heap_dump, "inspect:   %s\n", RSTRING_PTR(rb_obj_as_string(rb_inspect(obj))));
 +#ifdef GC_DEBUG 
 +#define P_SOURCE() do { \
 +    fprintf(heap_dump, "filename:  %s\n", RANY(obj)->file); \
 +    fprintf(heap_dump, "linenum:   %d\n", RANY(obj)->line); \
-+} while (0);
++} while (0)
 +#else
-+#define P_SOURCE() {}
++#define P_SOURCE() ()
 +#endif 
 +            switch (type) {
 +            case T_NODE:
@@ -114,7 +120,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +    P_REFOBJ(ND.u1.node); \
 +    P_REFOBJ(ND.u2.node); \
 +    P_REFOBJ(ND.u3.node); \
-+} while (0);
++} while (0)
 +                P_NODE(nd_type(obj), p->as.node);
 +                break;
 +            case T_CLASS:
@@ -220,7 +226,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
  /*
   *  The <code>GC</code> module provides an interface to Ruby's mark and
   *  sweep garbage collection mechanism. Some of the underlying methods
-@@ -2179,6 +2365,8 @@
+@@ -2179,6 +2371,8 @@
  
      rb_define_module_function(rb_mObSpace, "_id2ref", id2ref, 1);
  
