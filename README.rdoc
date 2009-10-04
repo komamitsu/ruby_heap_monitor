@@ -53,6 +53,7 @@ You can see the dumped informations inside 'hoge.log' like the below.
   ==========================================
   filename:  hoge.rb
   linenum:   26
+  time:      2009-10-04 23:17
   class:     Struct::Hoge
   object_id: 0xB7E4CFA5
   inspect:   #<struct Struct::Hoge cat=#<Foo:0xb7e4d490 @name="This is Foo", @array=["first", "second", "third"], @float=0.123456789, @int=99999999999999999999999999999999999999999, @proc=#<Proc:0xb7e4e8cc@hoge.rb:7>, @hash={"three"=>"Mar", "two"=>"Feb", "one"=>"Jan"}>, dog=#<Foo:0xb7e4d490 @name="This is Foo", @array=["first", "second", "third"], @float=0.123456789, @int=99999999999999999999999999999999999999999, @proc=#<Proc:0xb7e4e8cc@hoge.rb:7>, @hash={"three"=>"Mar", "two"=>"Feb", "one"=>"Jan"}>, monkey=#<File:hoge.log>>
@@ -65,12 +66,14 @@ You can see the dumped informations inside 'hoge.log' like the below.
   ==========================================
   filename:  hoge.rb
   linenum:   16
+  time:      2009-10-04 23:17
   class:     Bignum
   object_id: 0xB7E4E371
   inspect:   99999999999999999999999999999999999999999
   ==========================================
   filename:  hoge.rb
   linenum:   16
+  time:      2009-10-04 23:17
   type:      Node
   object_id: 0xB7E4E38D
   nodetype:  0x67
@@ -83,7 +86,7 @@ You can see the dumped informations inside 'hoge.log' like the below.
 == Problems
 - In the dumped file, references to the objects in the block are something wrong. 
 - I want to remove the node informations from the objects dump. But only they seem to refer the objects in the block. Do any heap objects other than nodes refer the objects in the block ?
-- I tested this patch with only Ruby 1.8.5 and 1.8.7.
+- I tested this patch with only Ruby 1.8.5 and 1.8.7 (in Rails).
 
 == Author
 Mitsunori Komatsu
