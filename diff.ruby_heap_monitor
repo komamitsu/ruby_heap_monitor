@@ -17,7 +17,7 @@ diff -Naru ruby18.orig/eval.c ruby18/eval.c
  {
 diff -Naru ruby18.orig/gc.c ruby18/gc.c
 --- ruby18.orig/gc.c	2009-09-04 23:20:38.000000000 +0900
-+++ ruby18/gc.c	2009-10-04 23:05:10.000000000 +0900
++++ ruby18/gc.c	2009-10-04 23:41:33.000000000 +0900
 @@ -44,6 +44,8 @@
  #include <windows.h>
  #endif
@@ -62,7 +62,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +static FILE *heap_dump = NULL;
 +
 +#define P_REFOBJ(V) do { \
-+    register void *v = (void*)V; \
++    void *v = (void*)V; \
 +    if (is_pointer_to_heap(v)) \
 +        fprintf(heap_dump, "    0x%08X\n", (unsigned int)rb_obj_id((VALUE)v)); \
 +} while (0)
@@ -106,12 +106,12 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +    heap_dump = GetWriteFile(RFILE(file)->fptr);
 +
 +    for (i = 0; i < heaps_used; i++) {
-+        register RVALUE *p, *pend;
++        RVALUE *p, *pend;
 +
 +        p = heaps[i].slot; pend = p + heaps[i].limit;
 +        for (;p < pend; p++) {
-+            register VALUE obj = (VALUE)p;
-+            register int type = p->as.basic.flags & T_MASK;
++            VALUE obj = (VALUE)p;
++            int type = p->as.basic.flags & T_MASK;
 +
 +            if (type == T_NONE || 
 +#ifdef T_ZOMBIE
