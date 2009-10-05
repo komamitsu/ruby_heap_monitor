@@ -17,7 +17,7 @@ diff -Naru ruby18.orig/eval.c ruby18/eval.c
  {
 diff -Naru ruby18.orig/gc.c ruby18/gc.c
 --- ruby18.orig/gc.c	2009-09-04 23:20:38.000000000 +0900
-+++ ruby18/gc.c	2009-10-05 01:22:35.000000000 +0900
++++ ruby18/gc.c	2009-10-05 08:47:35.000000000 +0900
 @@ -44,6 +44,8 @@
  #include <windows.h>
  #endif
@@ -52,7 +52,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
      return obj;
  }
  
-@@ -2147,6 +2151,230 @@
+@@ -2147,6 +2151,232 @@
      return (VALUE)((long)obj|FIXNUM_FLAG);
  }
  
@@ -61,18 +61,20 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +
 +static FILE *heap_dump = NULL;
 +
-+#define P_REFOBJ(V) do { \
-+    void *v = (void*)V; \
-+    if (is_pointer_to_heap(v)) \
-+        fprintf(heap_dump, "    0x%08X\n", (unsigned int)rb_obj_id((VALUE)v)); \
-+} while (0)
++static void
++print_refobj(p)
++    void *p;
++{
++    if (is_pointer_to_heap(p))
++        fprintf(heap_dump, "    0x%08X\n", (unsigned int)rb_obj_id((VALUE)p));
++}
 +
 +static int
 +print_obj_unit(key, value, lev)
 +    VALUE key, value;
 +    int lev;
 +{
-+    P_REFOBJ(value);
++    print_refobj(value);
 +    return ST_CONTINUE;
 +}
 +
@@ -213,7 +215,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +
 +                    P_REFTITLE();
 +                    for (i = 0; i < len; i++) {
-+                        P_REFOBJ(*ptr++);
++                        print_refobj(*ptr++);
 +                    }
 +                }
 +                if (type == T_HASH) {
@@ -226,19 +228,19 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +
 +                    P_REFTITLE();
 +                    for (i = 0; i < len; i++) {
-+                        P_REFOBJ(*ptr++);
++                        print_refobj(*ptr++);
 +                    }
 +                }
 +                if (type == T_MATCH) {
 +                    P_REFTITLE();
-+                    P_REFOBJ(p->as.match.str);
++                    print_refobj(p->as.match.str);
 +                }
 +                if (type == T_VARMAP) {
 +                    struct RVarmap *var = &p->as.varmap;
 +
 +                    P_REFTITLE();
 +                    while (var) {
-+                        P_REFOBJ(var->val);
++                        print_refobj(var->val);
 +                        var = var->next;
 +                    };
 +                }
@@ -266,7 +268,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
 +
 +                    P_REFTITLE();
 +                    while (n--) {
-+                        P_REFOBJ(*vars++);
++                        print_refobj(*vars++);
 +                    };
 +                }
 +                break;
@@ -283,7 +285,7 @@ diff -Naru ruby18.orig/gc.c ruby18/gc.c
  /*
   *  The <code>GC</code> module provides an interface to Ruby's mark and
   *  sweep garbage collection mechanism. Some of the underlying methods
-@@ -2179,6 +2407,8 @@
+@@ -2179,6 +2409,8 @@
  
      rb_define_module_function(rb_mObSpace, "_id2ref", id2ref, 1);
  
